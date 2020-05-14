@@ -1,25 +1,157 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
+title: "Activity Monitoring Analysis"
+author: "Ghassen Ghabarou"
 output: 
   html_document:
-    keep_md: true
+    toc: true
 ---
 
+## Data
 
-## Loading and preprocessing the data
+The data is from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day
+
+* * *
+
+## Research Questions
+
+This analysis aims to answer the following questions:
+
+- What is mean total number of steps taken per day?
+- What is the average daily activity pattern?
+- Are there differences in activity patterns between weekdays and weekends?
+
+* * *
+
+## Setup
+
+### Load Packages
+
+```{r}
+library(tidyverse)
+```
+
+### Load Data
+
+```{r}
+data <- read_csv("activity.csv",col_types = cols(
+  steps = col_integer(),
+  date = col_date(),
+  interval = col_integer()
+))
+```
+
+* * *
+
+## Exploratory Data Analysis
+
+```{r}
+glimpse(data)
+```
+
+A glimpse into the data shows us that we got twp variables which are integer and one that's date, we also see there's some missing values which we'll deal with later.
+
+**Research Question 1:**
+What is mean total number of steps taken per day?
+
+```{r}
+(d1 <- data %>% 
+  group_by(date) %>%
+  drop_na() %>% 
+  summarise(
+    total_steps_per_days = sum(steps),
+    mean_steps_per_days = mean(steps),
+    median_steps_per_days = median(steps)))
+```
+
+One thing to notice here is that most of the medians are null, that's because there's a lot of 5 minute intervals where the person doesn't walk any steps which is reasonable.
+
+```{r}
+d1 %>% 
+  count(total_steps_per_days)
+```
 
 
+```{r}
+ggplot(d1,aes(x = total_steps_per_days)) +
+  geom_histogram(binwidth = 3500)
+```
 
-## What is mean total number of steps taken per day?
+We see here that the person make a number of steps around 10000 quite often, and if we look at the table above, we'll notice is only during certain days so it might be related to work.
+
+**Research Question 2:**
+What is the average daily activity pattern?
+
+```{r}
+d2 <- data %>% 
+  group_by(interval) %>% 
+  drop_na() %>% 
+  summarise(average_steps = mean(steps))
+```
+
+```{r}
+ggplot(d2,aes(x = interval,y = average_steps)) +
+  geom_line()
+```
+
+From this plot we can see that there's one peak in the average steps and the rest of the day it's around 100 which could suggest indoor movement.
+
+```{r}
+d2 %>% 
+  arrange(desc(average_steps)) %>% 
+  top_n(1,average_steps)
+```
+
+The maximum average steps is done in the interval 835 which in hours is around 13 hours, so if the 0th interval correspond to midnight, it would be 1pm, this timing might suggest going to lunch
 
 
+**Imputing missing values**
 
-## What is the average daily activity pattern?
+```{r}
+data %>% 
+  filter_all(any_vars(is.na(.))) %>% 
+  count()
+```
+
+```{r}
+new_data <- data %>% 
+  group_by(interval) %>% 
+  mutate(steps = ifelse(is.na(steps),median(steps,na.rm = T),steps))
+```
+
+I chose to fill missing values with the median of the corresponding interval.
+
+```{r}
+(d3 <- new_data %>% 
+  group_by(date) %>%
+  drop_na() %>% 
+  summarise(
+    total_steps_per_days = sum(steps),
+    mean_steps_per_days = mean(steps),
+    median_steps_per_days = median(steps)))
+```
+
+```{r}
+ggplot(d3,aes(x = total_steps_per_days)) +
+  geom_histogram(binwidth = 3500)
+```
+
+Overall the histogram doesn't seems to differ from the first one, however there's a slight difference, we see that there's another peak around 100 steps which, like stated previously, might imply indoor movement.
+
+**Research Question 3:**
+Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+new_data %>% 
+  mutate(day_type = ifelse(weekdays(date) %in% c("Saturday","Sunday"),"Weekend","Weekday")) %>%
+  group_by(interval,day_type) %>% 
+  summarise(average = mean(steps)) %>% 
+  ggplot(aes(x = interval, y = average)) +
+    geom_line() +
+    facet_wrap(~day_type,nrow = 2)
+```
+
+We can see that there's higher day activity during the weekends than during weekdays, this might suggest that the person likes walking outside and exercising during weekends.
+
+* * *
 
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
